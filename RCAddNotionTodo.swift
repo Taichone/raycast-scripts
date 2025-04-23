@@ -2,7 +2,7 @@
 
 // Required parameters:
 // @raycast.schemaVersion 1
-// @raycast.title タスク作成
+// @raycast.title Add Notion Todo
 // @raycast.mode compact
 
 // Optional parameters:
