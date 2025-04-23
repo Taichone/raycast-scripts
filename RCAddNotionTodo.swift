@@ -11,10 +11,6 @@
 // @raycast.argument2 { "type": "text", "placeholder": "Date (YYYY-MM-DD)", "optional": true }
 // @raycast.packageName Notion
 
-// 環境変数の設定
-// @raycast.refreshTime 1h
-// @raycast.preferenceValues [{"name":"NOTION_TOKEN", "type":"password", "required":true, "title":"Notion APIトークン", "description":"NotionのAPIトークン"}, {"name":"NOTION_TASK_DATABASE_ID", "type":"textfield", "required":true, "title":"タスクデータベースID", "description":"タスクデータベースのID"}]
-
 import Foundation
 
 struct DateUtils {
