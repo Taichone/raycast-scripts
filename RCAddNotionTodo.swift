@@ -59,18 +59,8 @@ struct DateUtils {
         return formatter
     }()
     
-    enum DateError: Error, CustomStringConvertible {
-        case invalidFormat(String)
-        case emptyDate
-        
-        var description: String {
-            switch self {
-            case .invalidFormat(let message):
-                return message
-            case .emptyDate:
-                return "Error: No date specified"
-            }
-        }
+    enum DateError: Error {
+        case invalidFormat
     }
     
     static func validateDate(_ dateString: String?) -> Result<String, DateError> {
@@ -87,41 +77,39 @@ struct DateUtils {
             }
         }
         
+        // YYYY-MM-DD 形式
         if dateString.range(of: #"^\d{4}-\d{2}-\d{2}$"#, options: .regularExpression) != nil {
             if let date = dateFormatter.date(from: dateString) {
                 return .success(dateFormatter.string(from: date))
             }
         }
         
-        return .failure(.invalidFormat(
-            "Error: Enter date in YYYY-MM-DD format or +N (days from today).\nExample: 2023-12-31, +1, +7"
-        ))
+        return .failure(.invalidFormat)
     }
 }
 
 func main() {
-    // Read environment variables
+    // 環境変数を読み込む
     let env = EnvReader.getEnvDict()
     guard let notionToken = env["NOTION_TOKEN"], !notionToken.isEmpty else {
         print("ERROR: NOTION_TOKEN is not set")
         exit(1)
     }
-
     guard let databaseId = env["NOTION_TASK_DATABASE_ID"], !databaseId.isEmpty else {
         print("ERROR: NOTION_TASK_DATABASE_ID is not set")
         exit(1)
     }
 
+    // Raycast 引数を読み込む
     let arguments = CommandLine.arguments
     guard arguments.count > 1 else {
         print("ERROR: Please specify a title")
         exit(1)
     }
-
-    // Set Notion Database properties
     let title = arguments[1]
     let customDate = arguments.count > 2 ? arguments[2] : nil
 
+    // 
     let dateResult = DateUtils.validateDate(customDate)
     let startDate: String
     switch dateResult {
