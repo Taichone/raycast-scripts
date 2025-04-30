@@ -13,6 +13,8 @@
 
 import Foundation
 
+let argumentsCount = 1
+
 struct EnvReader {
     static func getEnvDict() -> [String: String] {
         var env = [String: String]()
@@ -102,14 +104,13 @@ func main() {
 
     // Raycast 引数を読み込む
     let arguments = CommandLine.arguments
-    guard arguments.count > 1 else {
+    guard arguments.count > argumentsCount else {
         print("ERROR: Please specify a title")
         exit(1)
     }
     let title = arguments[1]
     let customDate = arguments.count > 2 ? arguments[2] : nil
 
-    // 
     let dateResult = DateUtils.validateDate(customDate)
     let startDate: String
     switch dateResult {
