@@ -82,7 +82,7 @@ struct DateUtils {
 }
 
 struct NotionClient {
-    static func createTodo(notionToken: String, jsonData: [String: Any]) async throws {
+    static func createTodo(notionToken: String, requestJSONObject: [String: Any]) async throws {
         let url = URL(string: "https://api.notion.com/v1/pages")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -91,7 +91,7 @@ struct NotionClient {
         request.setValue("2022-06-28", forHTTPHeaderField: "Notion-Version")
         
         do {
-            request.httpBody = try JSONSerialization.data(withJSONObject: jsonData)
+            request.httpBody = try JSONSerialization.data(withJSONObject: requestJSONObject)
         } catch {
             throw NSError(domain: "NotionClientError", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to create JSON data"])
         }
@@ -129,8 +129,8 @@ func main() {
             let customDate = arguments[2]
             let startDate = try DateUtils.validateDate(customDate)
             
-            print("Sending request...")
-            let jsonData: [String: Any] = [
+            // Request
+            let requestJSONObject: [String: Any] = [
                 "parent": ["database_id": databaseId],
                 "properties": [
                     "Title": [
@@ -149,7 +149,9 @@ func main() {
                     ]
                 ]
             ]
-            try await NotionClient.createTodo(notionToken: notionToken, jsonData: jsonData)
+
+            print("Sending request...")
+            try await NotionClient.createTodo(notionToken: notionToken, requestJSONObject: requestJSONObject)
             print("Successfully created Todo!")
         } catch {
             print("ERROR: \(error)")
