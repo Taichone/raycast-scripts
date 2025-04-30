@@ -53,6 +53,12 @@ struct EnvReader {
 }
 
 struct DateUtils {
+    static let dateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
+    
     enum DateError: Error, CustomStringConvertible {
         case invalidFormat(String)
         case emptyDate
@@ -67,75 +73,31 @@ struct DateUtils {
         }
     }
     
-    // 静的な日付フォーマッター
-    static let dateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        return formatter
-    }()
-    
-    static func normalizeDate(_ dateString: String?) -> String? {
+    static func validateDate(_ dateString: String?) -> Result<String, DateError> {
+        // nilまたは空文字列の場合は今日の日付を返す
         guard let dateString = dateString, !dateString.isEmpty else {
-            return dateFormatter.string(from: Date())
-        }
-
-        if dateString.range(of: #"^\d{4}-\d{2}-\d{2}$"#, options: .regularExpression) != nil {
-            return dateString
+            return .success(dateFormatter.string(from: Date()))
         }
         
-        let normalizedDate = dateString.replacingOccurrences(of: "/", with: "-")
-        if normalizedDate.range(of: #"^\d{4}-\d{1,2}-\d{1,2}$"#, options: .regularExpression) != nil {
-            let components = normalizedDate.split(separator: "-")
-            if components.count == 3 {
-                let year = components[0]
-                let month = components[1].count == 1 ? "0\(components[1])" : components[1]
-                let day = components[2].count == 1 ? "0\(components[2])" : components[2]
-                return "\(year)-\(month)-\(day)"
-            }
-        }
-        
-        if normalizedDate.range(of: #"^\d{1,2}-\d{1,2}$"#, options: .regularExpression) != nil {
-            let components = normalizedDate.split(separator: "-")
-            if components.count == 2 {
-                let currentYear = Calendar.current.component(.year, from: Date())
-                let month = components[0].count == 1 ? "0\(components[0])" : components[0]
-                let day = components[1].count == 1 ? "0\(components[1])" : components[1]
-                return "\(currentYear)-\(month)-\(day)"
-            }
-        }
-
-        let today = Date()
-        let calendar = Calendar.current
-        
-        // デフォルトは今日
-        if dateString.isEmpty {
-            return dateFormatter.string(from: today)
-        }
-        
-        // 相対日付の処理（+N形式）
+        // +N形式（N日後）の処理
         if dateString.hasPrefix("+") {
-            if let daysToAdd = Int(dateString.dropFirst()) {
-                if let futureDate = calendar.date(byAdding: .day, value: daysToAdd, to: today) {
-                    return dateFormatter.string(from: futureDate)
-                }
+            if let daysToAdd = Int(dateString.dropFirst()),
+               let futureDate = Calendar.current.date(byAdding: .day, value: daysToAdd, to: Date()) {
+                return .success(dateFormatter.string(from: futureDate))
             }
         }
         
-        return nil
-    }
-    
-    static func processDate(_ dateString: String?) -> Result<String, DateError> {
-        // Try to convert if date is specified
-        if let dateStr = dateString {
-            if let normalizedDate = normalizeDate(dateStr) {
-                return .success(normalizedDate)
-            } else {
-                let errorMessage = "Error: Enter date in YYYY-MM-DD or YYYY/MM/DD format\nExample: 2023-12-31, 2023/12/31, 12-31, 12/31, +N, etc."
-                return .failure(.invalidFormat(errorMessage))
+        // 日付形式のバリデーション
+        if dateString.range(of: #"^\d{4}-\d{2}-\d{2}$"#, options: .regularExpression) != nil {
+            // YYYY-MM-DD形式が正しいかチェック
+            if let date = dateFormatter.date(from: dateString) {
+                return .success(dateFormatter.string(from: date))
             }
-        } else {
-            return .failure(.emptyDate)
         }
+        
+        // 無効な日付形式
+        let errorMessage = "Error: Enter date in YYYY-MM-DD format or +N (days from today).\nExample: 2023-12-31, +1, +7"
+        return .failure(.invalidFormat(errorMessage))
     }
 }
 
@@ -162,7 +124,7 @@ func main() {
     let title = arguments[1]
     let customDate = arguments.count > 2 ? arguments[2] : nil
 
-    let dateResult = DateUtils.processDate(customDate)
+    let dateResult = DateUtils.validateDate(customDate)
     let startDate: String
     switch dateResult {
     case .success(let date):
