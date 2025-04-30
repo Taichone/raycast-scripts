@@ -75,7 +75,7 @@ struct DateUtils {
     
     static func normalizeDate(_ dateString: String?) -> String? {
         guard let dateString = dateString, !dateString.isEmpty else {
-            return nil
+            return today()
         }
 
         if dateString.range(of: #"^\d{4}-\d{2}-\d{2}$"#, options: .regularExpression) != nil {
@@ -108,56 +108,32 @@ struct DateUtils {
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd"
         
-        switch dateString {
-        case "today", "今日", "今", "":
+        // デフォルトは今日
+        if dateString.isEmpty {
             return dateFormatter.string(from: today)
-        case "tomorrow", "明日", "あした", "あす":
-            if let tomorrow = calendar.date(byAdding: .day, value: 1, to: today) {
-                return dateFormatter.string(from: tomorrow)
+        }
+        
+        // 相対日付の処理（+N形式）
+        if dateString.hasPrefix("+") {
+            if let daysToAdd = Int(dateString.dropFirst()) {
+                if let futureDate = calendar.date(byAdding: .day, value: daysToAdd, to: today) {
+                    return dateFormatter.string(from: futureDate)
+                }
             }
-        case "day after tomorrow", "明後日", "あさって":
-            if let dayAfterTomorrow = calendar.date(byAdding: .day, value: 2, to: today) {
-                return dateFormatter.string(from: dayAfterTomorrow)
-            }
-        default:
-            break
         }
         
         return nil
     }
-    
-    /// Convert empty date string to nil
-    static func emptyToNil(_ dateString: String?) -> String? {
-        guard let dateString = dateString else {
-            return nil
-        }
-        
-        if dateString.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return nil
-        }
-        
-        return dateString
-    }
-    
-    /// Process date string and return valid date in YYYY-MM-DD format
-    /// - Parameters:
-    ///   - dateString: Date string to process
-    ///   - defaultToToday: Use today's date if date is invalid or not specified
-    /// - Returns: Processing result (date string if successful, error message if failed)
-    static func processDate(_ dateString: String?, defaultToToday: Bool = true) -> Result<String, DateError> {
-        let cleanDateString = emptyToNil(dateString)
-        
+
+    static func processDate(_ dateString: String?) -> Result<String, DateError> {
         // Try to convert if date is specified
-        if let dateStr = cleanDateString {
+        if let dateStr = dateString {
             if let normalizedDate = normalizeDate(dateStr) {
                 return .success(normalizedDate)
             } else {
-                let errorMessage = "Error: Enter date in YYYY-MM-DD or YYYY/MM/DD format\nExample: 2023-12-31, 2023/12/31, 12-31, 12/31, today, tomorrow, etc."
+                let errorMessage = "Error: Enter date in YYYY-MM-DD or YYYY/MM/DD format\nExample: 2023-12-31, 2023/12/31, 12-31, 12/31, today, tomorrow, +N, etc."
                 return .failure(.invalidFormat(errorMessage))
             }
-        } else if defaultToToday {
-            let todayStr = today()
-            return .success(todayStr)
         } else {
             return .failure(.emptyDate)
         }
