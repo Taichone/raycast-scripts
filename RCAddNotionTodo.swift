@@ -16,40 +16,35 @@ import Foundation
 let argumentsCount = 1
 
 struct EnvReader {
-    static func getEnvDict() -> [String: String] {
+    static func getEnvDict() throws -> [String: String] {
         var env = [String: String]()
         let fileManager = FileManager.default
         let currentPath = fileManager.currentDirectoryPath
         let envPath = currentPath + "/.env"
         
         guard fileManager.fileExists(atPath: envPath) else {
-            print("Warning: .env file not found: \(envPath)")
-            return env
+            throw NSError(domain: "EnvReaderError", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to read .env file"])
         }
-
-        do {
-            let contents = try String(contentsOfFile: envPath, encoding: .utf8)
-            contents.components(separatedBy: .newlines).forEach { line in
-                let trimmedLine = line.trimmingCharacters(in: .whitespacesAndNewlines)
-                if !trimmedLine.isEmpty && !trimmedLine.hasPrefix("#") {
-                    let parts = trimmedLine.split(separator: "=", maxSplits: 1)
-                    if parts.count == 2 {
-                        let key = String(parts[0]).trimmingCharacters(in: .whitespacesAndNewlines)
-                        var value = String(parts[1]).trimmingCharacters(in: .whitespacesAndNewlines)
-                        
-                        if (value.hasPrefix("\"") && value.hasSuffix("\"")) || 
+        
+        let contents = try String(contentsOfFile: envPath, encoding: .utf8)
+        contents.components(separatedBy: .newlines).forEach { line in
+            let trimmedLine = line.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmedLine.isEmpty && !trimmedLine.hasPrefix("#") {
+                let parts = trimmedLine.split(separator: "=", maxSplits: 1)
+                if parts.count == 2 {
+                    let key = String(parts[0]).trimmingCharacters(in: .whitespacesAndNewlines)
+                    var value = String(parts[1]).trimmingCharacters(in: .whitespacesAndNewlines)
+                    
+                    if (value.hasPrefix("\"") && value.hasSuffix("\"")) || 
                         (value.hasPrefix("'") && value.hasSuffix("'")) {
-                            value = String(value.dropFirst().dropLast())
-                        }
-                        
-                        env[key] = value
+                        value = String(value.dropFirst().dropLast())
                     }
+                    
+                    env[key] = value
                 }
             }
-        } catch {
-            print("ERROR: Failed to read .env file: \(error.localizedDescription)")
         }
-
+        
         return env
     }
 }
@@ -61,133 +56,109 @@ struct DateUtils {
         return formatter
     }()
     
-    enum DateError: Error {
-        case invalidFormat
-    }
-    
-    static func validateDate(_ dateString: String?) -> Result<String, DateError> {
+    static func validateDate(_ dateString: String?) throws -> String {
         // nilまたは空文字列の場合は今日の日付を返す
         guard let dateString = dateString, !dateString.isEmpty else {
-            return .success(dateFormatter.string(from: Date()))
+            return dateFormatter.string(from: Date())
         }
         
         // N日後の処理
         if dateString.hasPrefix("+") {
             if let daysToAdd = Int(dateString.dropFirst()),
                let futureDate = Calendar.current.date(byAdding: .day, value: daysToAdd, to: Date()) {
-                return .success(dateFormatter.string(from: futureDate))
+                return dateFormatter.string(from: futureDate)
             }
         }
         
         // YYYY-MM-DD 形式
         if dateString.range(of: #"^\d{4}-\d{2}-\d{2}$"#, options: .regularExpression) != nil {
             if let date = dateFormatter.date(from: dateString) {
-                return .success(dateFormatter.string(from: date))
+                return dateFormatter.string(from: date)
             }
         }
         
-        return .failure(.invalidFormat)
+        throw NSError(domain: "DateUtilsError", code: 1, userInfo: [NSLocalizedDescriptionKey: "Invalid date format"])
     }
 }
 
 struct NotionClient {
-    static func createTodo(notionToken: String, jsonData: [String: Any]) async {
+    static func createTodo(notionToken: String, jsonData: [String: Any]) async throws {
         let url = URL(string: "https://api.notion.com/v1/pages")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("Bearer \(notionToken)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("2022-06-28", forHTTPHeaderField: "Notion-Version")
-
+        
         do {
             request.httpBody = try JSONSerialization.data(withJSONObject: jsonData)
         } catch {
-            print("Error: Failed to create JSON data")
-            exit(1)
+            throw NSError(domain: "NotionClientError", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to create JSON data"])
         }
-
-        do {
-            let (data, _) = try await URLSession.shared.data(for: request)
-            
-            guard let responseString = String(data: data, encoding: .utf8) else {
-                print("Error: Failed to parse response")
-                exit(1)
-            }
-            
-            if responseString.contains("error") {
-                print("An error occurred:")
-                print(responseString)
-                exit(1)
-            } else {
-                print("Created Todo")
-            }
-            exit(0)
-        } catch {
-            print("An error occurred:")
-            print(error.localizedDescription)
-            exit(1)
+        
+        let (data, _) = try await URLSession.shared.data(for: request)
+        
+        guard let responseString = String(data: data, encoding: .utf8) else {
+            throw NSError(domain: "NotionClientError", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to parse response"])
+        }
+        
+        if responseString.contains("error") {
+            throw NSError(domain: "NotionClientError", code: 1, userInfo: [NSLocalizedDescriptionKey: "An error occurred: \(responseString)"])
         }
     }
 }
 
 func main() {
     Task {
-        // 環境変数を読み込む
-        let env = EnvReader.getEnvDict()
-        guard let notionToken = env["NOTION_TOKEN"], !notionToken.isEmpty else {
-            print("ERROR: NOTION_TOKEN is not set")
-            exit(1)
-        }
-        guard let databaseId = env["NOTION_TASK_DATABASE_ID"], !databaseId.isEmpty else {
-            print("ERROR: NOTION_TASK_DATABASE_ID is not set")
-            exit(1)
-        }
-
-        // Raycast 引数を読み込む
-        let arguments = CommandLine.arguments
-        guard arguments.count > argumentsCount else {
-            print("ERROR: Please specify a title")
-            exit(1)
-        }
-        let title = arguments[1]
-        let customDate = arguments.count > 2 ? arguments[2] : nil
-
-        let dateResult = DateUtils.validateDate(customDate)
-        let startDate: String
-        switch dateResult {
-        case .success(let date):
-            startDate = date
-        case .failure(let error):
-            print(error)
-            exit(1)
-        }
-
-        print("Sending request...")
-
-        // 対象の Notion Database 形式に合わせる
-        let jsonData: [String: Any] = [
-            "parent": ["database_id": databaseId],
-            "properties": [
-                "Title": [
-                    "title": [
-                        [
-                            "text": [
-                                "content": title
+        do {
+            // 環境変数を読み込む
+            let env = try EnvReader.getEnvDict()
+            guard let notionToken = env["NOTION_TOKEN"], !notionToken.isEmpty else {
+                throw NSError(domain: "EnvReaderError", code: 1, userInfo: [NSLocalizedDescriptionKey: "NOTION_TOKEN is not set"])
+            }
+            guard let databaseId = env["NOTION_TASK_DATABASE_ID"], !databaseId.isEmpty else {
+                throw NSError(domain: "EnvReaderError", code: 1, userInfo: [NSLocalizedDescriptionKey: "NOTION_TASK_DATABASE_ID is not set"])
+            }
+            
+            // Raycast 引数を読み込む
+            let arguments = CommandLine.arguments
+            guard arguments.count > argumentsCount else {
+                throw NSError(domain: "EnvReaderError", code: 1, userInfo: [NSLocalizedDescriptionKey: "Please specify a title"])
+            }
+            let title = arguments[1]
+            let customDate = arguments[2]
+            let startDate = try DateUtils.validateDate(customDate)
+            
+            print("Sending request...")
+            let jsonData: [String: Any] = [
+                "parent": ["database_id": databaseId],
+                "properties": [
+                    "Title": [
+                        "title": [
+                            [
+                                "text": [
+                                    "content": title
+                                ]
                             ]
                         ]
-                    ]
-                ],
-                "Date": [
-                    "date": [
-                        "start": startDate
+                    ],
+                    "Date": [
+                        "date": [
+                            "start": startDate
+                        ]
                     ]
                 ]
             ]
-        ]
-
-        await NotionClient.createTodo(notionToken: notionToken, jsonData: jsonData)
+            try await NotionClient.createTodo(notionToken: notionToken, jsonData: jsonData)
+            print("Successfully created Todo!")
+        } catch {
+            print("ERROR: \(error)")
+            exit(1)
+        }
+        
+        exit(0)
     }
-
+    
     RunLoop.main.run()
 }
 
