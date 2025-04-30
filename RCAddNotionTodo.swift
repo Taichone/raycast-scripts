@@ -67,15 +67,16 @@ struct DateUtils {
         }
     }
     
-    static func today() -> String {
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "yyyy-MM-dd"
-        return dateFormatter.string(from: Date())
-    }
+    // 静的な日付フォーマッター
+    static let dateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
     
     static func normalizeDate(_ dateString: String?) -> String? {
         guard let dateString = dateString, !dateString.isEmpty else {
-            return today()
+            return dateFormatter.string(from: Date())
         }
 
         if dateString.range(of: #"^\d{4}-\d{2}-\d{2}$"#, options: .regularExpression) != nil {
@@ -105,8 +106,6 @@ struct DateUtils {
 
         let today = Date()
         let calendar = Calendar.current
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "yyyy-MM-dd"
         
         // デフォルトは今日
         if dateString.isEmpty {
@@ -124,14 +123,14 @@ struct DateUtils {
         
         return nil
     }
-
+    
     static func processDate(_ dateString: String?) -> Result<String, DateError> {
         // Try to convert if date is specified
         if let dateStr = dateString {
             if let normalizedDate = normalizeDate(dateStr) {
                 return .success(normalizedDate)
             } else {
-                let errorMessage = "Error: Enter date in YYYY-MM-DD or YYYY/MM/DD format\nExample: 2023-12-31, 2023/12/31, 12-31, 12/31, today, tomorrow, +N, etc."
+                let errorMessage = "Error: Enter date in YYYY-MM-DD or YYYY/MM/DD format\nExample: 2023-12-31, 2023/12/31, 12-31, 12/31, +N, etc."
                 return .failure(.invalidFormat(errorMessage))
             }
         } else {
