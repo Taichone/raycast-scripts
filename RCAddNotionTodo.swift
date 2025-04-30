@@ -13,6 +13,45 @@
 
 import Foundation
 
+struct Environment {
+    static func load() -> [String: String] {
+        var env = [String: String]()
+        let fileManager = FileManager.default
+        let currentPath = fileManager.currentDirectoryPath
+        let envPath = currentPath + "/.env"
+        
+        guard fileManager.fileExists(atPath: envPath) else {
+            print("Warning: .env file not found: \(envPath)")
+            return env
+        }
+
+        do {
+            let contents = try String(contentsOfFile: envPath, encoding: .utf8)
+            contents.components(separatedBy: .newlines).forEach { line in
+                let trimmedLine = line.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !trimmedLine.isEmpty && !trimmedLine.hasPrefix("#") {
+                    let parts = trimmedLine.split(separator: "=", maxSplits: 1)
+                    if parts.count == 2 {
+                        let key = String(parts[0]).trimmingCharacters(in: .whitespacesAndNewlines)
+                        var value = String(parts[1]).trimmingCharacters(in: .whitespacesAndNewlines)
+                        
+                        if (value.hasPrefix("\"") && value.hasSuffix("\"")) || 
+                        (value.hasPrefix("'") && value.hasSuffix("'")) {
+                            value = String(value.dropFirst().dropLast())
+                        }
+                        
+                        env[key] = value
+                    }
+                }
+            }
+        } catch {
+            print("ERROR: Failed to read .env file: \(error.localizedDescription)")
+        }
+
+        return env
+    }
+}
+
 struct DateUtils {
     enum DateError: Error, CustomStringConvertible {
         case invalidFormat(String)
@@ -125,52 +164,52 @@ struct DateUtils {
     }
 }
 
-func loadEnvFile() -> [String: String] {
-    var env = [String: String]()
-    let fileManager = FileManager.default
-    let currentPath = fileManager.currentDirectoryPath
-    let envPath = currentPath + "/.env"
-    
-    guard fileManager.fileExists(atPath: envPath) else {
-        print("Warning: .env file not found: \(envPath)")
-        return env
-    }
-    
-    do {
-        let contents = try String(contentsOfFile: envPath, encoding: .utf8)
-        contents.components(separatedBy: .newlines).forEach { line in
-            let trimmedLine = line.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !trimmedLine.isEmpty && !trimmedLine.hasPrefix("#") {
-                let parts = trimmedLine.split(separator: "=", maxSplits: 1)
-                if parts.count == 2 {
-                    let key = String(parts[0]).trimmingCharacters(in: .whitespacesAndNewlines)
-                    var value = String(parts[1]).trimmingCharacters(in: .whitespacesAndNewlines)
-                    
-                    if (value.hasPrefix("\"") && value.hasSuffix("\"")) || 
-                       (value.hasPrefix("'") && value.hasSuffix("'")) {
-                        value = String(value.dropFirst().dropLast())
+struct Env {
+    static func load() -> [String: String] {
+        var env = [String: String]()
+        let fileManager = FileManager.default
+        let currentPath = fileManager.currentDirectoryPath
+        let envPath = currentPath + "/.env"
+
+        guard fileManager.fileExists(atPath: envPath) else {
+            print("Warning: .env file not found: \(envPath)")
+            return env
+        }
+
+        do {
+            let contents = try String(contentsOfFile: envPath, encoding: .utf8)
+            contents.components(separatedBy: .newlines).forEach { line in
+                let trimmedLine = line.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !trimmedLine.isEmpty && !trimmedLine.hasPrefix("#") {
+                    let parts = trimmedLine.split(separator: "=", maxSplits: 1)
+                    if parts.count == 2 {
+                        let key = String(parts[0]).trimmingCharacters(in: .whitespacesAndNewlines)
+                        var value = String(parts[1]).trimmingCharacters(in: .whitespacesAndNewlines)
+                        
+                        if (value.hasPrefix("\"") && value.hasSuffix("\"")) || 
+                        (value.hasPrefix("'") && value.hasSuffix("'")) {
+                            value = String(value.dropFirst().dropLast())
+                        }
+                        
+                        env[key] = value
                     }
-                    
-                    env[key] = value
                 }
             }
+        } catch {
+            print("ERROR: Failed to read .env file: \(error.localizedDescription)")
         }
-    } catch {
-        print("ERROR: Failed to read .env file: \(error.localizedDescription)")
+
+        return env
     }
-    
-    return env
 }
 
-let envVars = loadEnvFile()
-let notionToken = ProcessInfo.processInfo.environment["NOTION_TOKEN"] ?? envVars["NOTION_TOKEN"] ?? ""
-let databaseId = ProcessInfo.processInfo.environment["NOTION_TASK_DATABASE_ID"] ?? envVars["NOTION_TASK_DATABASE_ID"] ?? ""
-if notionToken.isEmpty {
+let env = Env.load()
+guard let notionToken = env["NOTION_TOKEN"], !notionToken.isEmpty else {
     print("ERROR: NOTION_TOKEN is not set")
     exit(1)
 }
 
-if databaseId.isEmpty {
+guard let databaseId = env["NOTION_TASK_DATABASE_ID"], !databaseId.isEmpty else {
     print("ERROR: NOTION_TASK_DATABASE_ID is not set")
     exit(1)
 }
