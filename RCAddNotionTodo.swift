@@ -79,7 +79,7 @@ struct DateUtils {
             return .success(dateFormatter.string(from: Date()))
         }
         
-        // +N形式（N日後）の処理
+        // N日後の処理
         if dateString.hasPrefix("+") {
             if let daysToAdd = Int(dateString.dropFirst()),
                let futureDate = Calendar.current.date(byAdding: .day, value: daysToAdd, to: Date()) {
@@ -87,17 +87,15 @@ struct DateUtils {
             }
         }
         
-        // 日付形式のバリデーション
         if dateString.range(of: #"^\d{4}-\d{2}-\d{2}$"#, options: .regularExpression) != nil {
-            // YYYY-MM-DD形式が正しいかチェック
             if let date = dateFormatter.date(from: dateString) {
                 return .success(dateFormatter.string(from: date))
             }
         }
         
-        // 無効な日付形式
-        let errorMessage = "Error: Enter date in YYYY-MM-DD format or +N (days from today).\nExample: 2023-12-31, +1, +7"
-        return .failure(.invalidFormat(errorMessage))
+        return .failure(.invalidFormat(
+            "Error: Enter date in YYYY-MM-DD format or +N (days from today).\nExample: 2023-12-31, +1, +7"
+        ))
     }
 }
 
