@@ -1,15 +1,17 @@
 #!/usr/bin/swift
 
-// Required parameters:
-// @raycast.schemaVersion 1
-// @raycast.title Add Notion Todo
-// @raycast.mode compact
+/*
+Required parameters:
+@raycast.schemaVersion 1
+@raycast.title Add Notion Todo
+@raycast.mode compact
 
-// Optional parameters:
-// @raycast.icon ./Assets/notion.png
-// @raycast.argument1 { "type": "text", "placeholder": "Title" }
-// @raycast.argument2 { "type": "text", "placeholder": "Date (yyyy-mm-dd, +n)", "optional": true }
-// @raycast.packageName Notion
+Optional parameters:
+@raycast.icon ./Assets/notion.png
+@raycast.argument1 { "type": "text", "placeholder": "Title" }
+@raycast.argument2 { "type": "text", "placeholder": "Date (yyyy-mm-dd, +n)", "optional": true }
+@raycast.packageName Notion
+*/
 
 import Foundation
 
