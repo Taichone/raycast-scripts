@@ -2,56 +2,51 @@
 
 // Required parameters:
 // @raycast.schemaVersion 1
-// @raycast.title Create PR Review
+// @raycast.title PR Generator
 // @raycast.mode compact
 
 // Optional parameters:
-// @raycast.icon ./icons/dify.png
+// @raycast.icon ./Assets/GitHub.png
 // @raycast.argument1 { "type": "dropdown", "placeholder": "Language", "optional": false, "data": [{"title": "English", "value": "english"}, {"title": "Japanese", "value": "japanese"}] }
 // @raycast.argument2 { "type": "text", "placeholder": "Diff (optional)", "optional": true }
 // @raycast.packageName Dify
 
-// 環境変数の設定
-// @raycast.refreshTime 1h
-// @raycast.preferenceValues [{"name":"DIFY_BASE_URL", "type":"textfield", "required":true, "title":"Dify API URL", "description":"Dify APIのベースURL", "default":"https://dify.arklet.jp/v1"}, {"name":"DIFY_PR_TOKEN", "type":"password", "required":true, "title":"Dify PR API Token", "description":"PR生成AIのAPIトークン"}]
-
 import Foundation
 
-// 設定とユーティリティ関数
-let defaultDifyBaseURL = "https://dify.arklet.jp/v1"
+let argumentsCount = 1
 
-// 環境変数を取得する関数
-func getEnvironmentVariable(_ name: String) -> String? {
-    return ProcessInfo.processInfo.environment[name]
-}
-
-// .envファイルから環境変数を読み込む関数
-func loadEnvFile() {
-    let fileManager = FileManager.default
-    if fileManager.fileExists(atPath: ".env") {
-        do {
-            let envContent = try String(contentsOfFile: ".env", encoding: .utf8)
-            let lines = envContent.split(separator: "\n")
-            
-            for line in lines {
-                if line.hasPrefix("#") { continue }
-                let parts = line.split(separator: "=", maxSplits: 1)
+struct EnvReader {
+    static func getEnvDict() throws -> [String: String] {
+        var env = [String: String]()
+        let fileManager = FileManager.default
+        let currentPath = fileManager.currentDirectoryPath
+        let envPath = currentPath + "/.env"
+        
+        guard fileManager.fileExists(atPath: envPath) else {
+            throw NSError(domain: "EnvReaderError", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to read .env file"])
+        }
+        
+        let contents = try String(contentsOfFile: envPath, encoding: .utf8)
+        contents.components(separatedBy: .newlines).forEach { line in
+            let trimmedLine = line.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmedLine.isEmpty && !trimmedLine.hasPrefix("#") {
+                let parts = trimmedLine.split(separator: "=", maxSplits: 1)
                 if parts.count == 2 {
                     let key = String(parts[0]).trimmingCharacters(in: .whitespacesAndNewlines)
-                    let value = String(parts[1]).trimmingCharacters(in: .whitespacesAndNewlines)
-                    setenv(key, value, 1)
+                    var value = String(parts[1]).trimmingCharacters(in: .whitespacesAndNewlines)
+                    
+                    if (value.hasPrefix("\"") && value.hasSuffix("\"")) || 
+                        (value.hasPrefix("'") && value.hasSuffix("'")) {
+                        value = String(value.dropFirst().dropLast())
+                    }
+                    
+                    env[key] = value
                 }
             }
-        } catch {
-            print("Error loading .env file: \(error)")
         }
+        
+        return env
     }
-}
-
-// エラーを標準出力して終了する関数
-func exitWithError(_ message: String) -> Never {
-    print("Error: \(message)")
-    exit(1)
 }
 
 // クリップボードから内容を取得する関数
@@ -101,137 +96,121 @@ func escapeJSONString(_ string: String) -> String {
     return string
 }
 
-// メイン処理
 func main() {
-    // .envファイルがあれば読み込む
-    loadEnvFile()
-    
-    // 環境変数の取得
-    let difyBaseURL = getEnvironmentVariable("DIFY_BASE_URL") ?? defaultDifyBaseURL
-    guard let difyApiToken = getEnvironmentVariable("DIFY_PR_TOKEN") else {
-        exitWithError("DIFY_PR_TOKEN is not set")
-    }
-    
-    // コマンドライン引数の取得
-    let arguments = CommandLine.arguments
-    
-    // 環境（必須引数）
-    guard arguments.count >= 2 else {
-        exitWithError("Environment argument is required")
-    }
-    let environment = arguments[1]
-    print("Selected environment: \(environment)")
-    
-    // Diff（オプション引数）
-    var gitDiff = ""
-    if arguments.count >= 3 && !arguments[2].isEmpty {
-        gitDiff = arguments[2]
-    } else {
-        print("No diff provided as argument. Getting diff from clipboard...")
-        if let clipboardContent = getClipboardContent(), !clipboardContent.isEmpty {
-            gitDiff = clipboardContent
-        } else {
-            exitWithError("No diff found in clipboard. Please provide a diff as an argument or copy it to clipboard.")
-        }
-    }
-    
-    print("Generating PR review for \(environment) environment...")
-    
-    // JSON データの準備
-    // gitDiffをJSONエスケープする必要がある
-    let jsonData = """
-    {
-      "inputs": {
-        "environment": "\(environment)",
-        "git_diff": \(gitDiff.data(using: .utf8)!.base64EncodedString().debugDescription)
-      },
-      "response_mode": "blocking",
-      "user": "raycast-user"
-    }
-    """
-    
-    // URLリクエストの準備
-    guard let url = URL(string: "\(difyBaseURL)/completion-messages") else {
-        exitWithError("Invalid URL")
-    }
-    
-    var request = URLRequest(url: url)
-    request.httpMethod = "POST"
-    request.addValue("Bearer \(difyApiToken)", forHTTPHeaderField: "Authorization")
-    request.addValue("application/json", forHTTPHeaderField: "Content-Type")
-    request.httpBody = jsonData.data(using: .utf8)
-    
-    // セマフォを使用して同期的にリクエストを処理
-    let semaphore = DispatchSemaphore(value: 0)
-    var responseData: Data?
-    var responseError: Error?
-    
-    // APIリクエスト送信
-    let task = URLSession.shared.dataTask(with: request) { data, response, error in
-        responseData = data
-        responseError = error
-        semaphore.signal()
-    }
-    task.resume()
-    
-    // レスポンスを待つ
-    semaphore.wait()
-    
-    // エラー処理
-    if let error = responseError {
-        exitWithError("API request failed: \(error)")
-    }
-    
-    guard let data = responseData else {
-        exitWithError("No data received from API")
-    }
-    
-    // デバッグ用にレスポンス全体を表示
-    if let responseString = String(data: data, encoding: .utf8) {
-        print("API レスポンス:")
-        print(responseString)
-        
-        // レスポンスからPRレビュー文を抽出
-        var prReview: String?
-        
+    Task {
         do {
-            if let json = try JSONSerialization.jsonObject(with: data, options: []) as? [String: Any] {
-                // 最初の抽出方法
-                if let answer = json["answer"] as? String {
-                    prReview = answer
-                } else if let dataDict = json["data"] as? [String: Any] {
-                    // 代替抽出方法
-                    if let answer = dataDict["answer"] as? String {
-                        prReview = answer
-                    } else if let outputs = dataDict["outputs"] as? [String: Any], 
-                              let text = outputs["text"] as? String {
-                        prReview = text
-                    }
+            // 環境変数を読み込む
+            let env = try EnvReader.getEnvDict()
+            guard let difyBaseURL = env["DIFY_BASE_URL"], !difyBaseURL.isEmpty else {
+                throw NSError(domain: "EnvReaderError", code: 1, userInfo: [NSLocalizedDescriptionKey: "DIFY_BASE_URL is not set"])
+            }
+            guard let difyAPIToken = env["DIFY_PR_GENERATOR_API_TOKEN"], !difyAPIToken.isEmpty else {
+                throw NSError(domain: "EnvReaderError", code: 1, userInfo: [NSLocalizedDescriptionKey: "DIFY_PR_GENERATOR_API_TOKEN is not set"])
+            }
+            
+            // Raycast 引数を読み込む
+            let arguments = CommandLine.arguments
+            guard arguments.count > argumentsCount else {
+                throw NSError(domain: "EnvReaderError", code: 1, userInfo: [NSLocalizedDescriptionKey: "Please specify a title"])
+            }
+            let language = arguments[1]
+            
+            // Request
+            // Diff（オプション引数）
+            var diffContent = ""
+            if arguments.count >= 3 && !arguments[2].isEmpty {
+                diffContent = arguments[2]
+            } else {
+                if let clipboardContent = getClipboardContent(), !clipboardContent.isEmpty {
+                    diffContent = clipboardContent
+                } else {
+                    throw NSError(domain: "EnvReaderError", code: 1, userInfo: [NSLocalizedDescriptionKey: "No diff found in clipboard. Please provide a diff as an argument or copy it to clipboard."])
                 }
             }
+            
+            // JSON データの準備
+            // gitDiffをJSONエスケープする必要がある
+            let jsonData = """
+            {
+              "inputs": {
+                "language": "\(language)",
+                "git_diff": \(diffContent.data(using: .utf8)!.base64EncodedString().debugDescription)
+              },
+              "response_mode": "blocking",
+              "user": "raycast-user"
+            }
+            """
+            
+            // URLリクエストの準備
+            guard let url = URL(string: "\(difyBaseURL)/completion-messages") else {
+                throw NSError(domain: "EnvReaderError", code: 1, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"])
+            }
+            
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.addValue("Bearer \(difyAPIToken)", forHTTPHeaderField: "Authorization")
+            request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = jsonData.data(using: .utf8)
+            
+            // APIリクエスト送信と応答の受信
+            let (data, _) = try await URLSession.shared.data(for: request)
+            
+            // デバッグ用にレスポンス全体を表示
+            if let responseString = String(data: data, encoding: .utf8) {
+                print("API レスポンス:")
+                print(responseString)
+                
+                // レスポンスからPRレビュー文を抽出
+                var prReview: String?
+                
+                do {
+                    if let json = try JSONSerialization.jsonObject(with: data, options: []) as? [String: Any] {
+                        // 最初の抽出方法
+                        if let answer = json["answer"] as? String {
+                            prReview = answer
+                        } else if let dataDict = json["data"] as? [String: Any] {
+                            // 代替抽出方法
+                            if let answer = dataDict["answer"] as? String {
+                                prReview = answer
+                            } else if let outputs = dataDict["outputs"] as? [String: Any], 
+                                      let text = outputs["text"] as? String {
+                                prReview = text
+                            }
+                        }
+                    }
+                } catch {
+                    throw NSError(domain: "EnvReaderError", code: 1, userInfo: [NSLocalizedDescriptionKey: "JSON parsing error: \(error)"])
+                }
+                
+                // 抽出結果の確認
+                if let review = prReview, !review.isEmpty {
+                    // PRレビュー文をクリップボードにコピー
+                    copyToClipboard(review)
+                    
+                    // 完了メッセージ
+                    print("PR review created and copied to clipboard")
+                    print("--------- Created PR Review ---------")
+                    print(review)
+                } else {
+                    throw NSError(
+                        domain: "EnvReaderError",
+                        code: 1,
+                        userInfo: [NSLocalizedDescriptionKey: "Failed to extract PR review, copying original response: \(responseString)"]
+                    )
+                }
+            } else {
+                throw NSError(domain: "EnvReaderError", code: 1, userInfo: [NSLocalizedDescriptionKey: "Could not decode response data"])
+            }
         } catch {
-            print("JSON parsing error: \(error)")
+            print("ERROR: \(error)")
+            exit(1)
         }
         
-        // 抽出結果の確認
-        if let review = prReview, !review.isEmpty {
-            // PRレビュー文をクリップボードにコピー
-            copyToClipboard(review)
-            
-            // 完了メッセージ
-            print("PR review created and copied to clipboard")
-            print("--------- Created PR Review ---------")
-            print(review)
-        } else {
-            print("Failed to extract PR review, copying original response")
-            copyToClipboard(responseString)
-            print("Original response copied to clipboard")
-        }
-    } else {
-        exitWithError("Could not decode response data")
+        print("Successfully generated PR description!")
+        exit(0)
     }
+    
+    RunLoop.main.run()
 }
 
-// プログラム実行
 main()
-
