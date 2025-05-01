@@ -6,7 +6,7 @@
 // @raycast.mode compact
 
 // Optional parameters:
-// @raycast.icon ./Assets/Notion.png
+// @raycast.icon ./Assets/notion.png
 // @raycast.argument1 { "type": "text", "placeholder": "Title" }
 // @raycast.argument2 { "type": "text", "placeholder": "Date (YYYY-MM-DD)", "optional": true }
 // @raycast.packageName Notion
