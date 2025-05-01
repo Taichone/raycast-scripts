@@ -54,7 +54,7 @@ fi
 
 echo "Generating PR description for $LANGUAGE language..."
 
-# JSONデータの準備
+# --- Dify ワークフロー ---
 JSON_DATA='{
   "inputs": {
     "language": "'"$LANGUAGE"'",
@@ -64,7 +64,6 @@ JSON_DATA='{
   "user": "raycast-user"
 }'
 
-# Dify APIリクエスト送信
 RESPONSE=$(curl -s -X POST "${DIFY_BASE_URL}/workflows/run" \
   -H "Authorization: Bearer ${DIFY_API_TOKEN}" \
   -H "Content-Type: application/json" \
@@ -72,7 +71,7 @@ RESPONSE=$(curl -s -X POST "${DIFY_BASE_URL}/workflows/run" \
 
 echo "$RESPONSE" | jq '.'
 
-# レスポンスからPRレビュー文を抽出（jqを使用）
+# レスポンスから値を抽出（jqを使用）
 PR_DESCRIPTION=$(echo "$RESPONSE" | jq -r '.data.outputs.result')
 
 # 抽出結果の確認
