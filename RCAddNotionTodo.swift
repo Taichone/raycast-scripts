@@ -13,7 +13,7 @@
 
 import Foundation
 
-let argumentsCount = 1
+let argumentsCount = 2
 
 struct EnvReader {
     static func getEnvDict() throws -> [String: String] {
