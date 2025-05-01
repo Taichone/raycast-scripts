@@ -11,16 +11,14 @@
 # @raycast.argument2 { "type": "text", "placeholder": "Diff (optional)", "optional": true }
 # @raycast.packageName Dify
 
-# .envファイルが存在する場合は読み込む
+# 環境変数の取得 ---
 if [ -f .env ]; then
   export $(grep -v '^#' .env | xargs)
 fi
 
-# 環境変数の取得
 DIFY_BASE_URL=$DIFY_BASE_URL
 DIFY_API_TOKEN=$DIFY_PR_GENERATOR_API_TOKEN
 
-# 環境変数チェック
 if [ -z "$DIFY_BASE_URL" ]; then
   echo "Error: DIFY_BASE_URL is not set"
   exit 1
@@ -31,30 +29,27 @@ if [ -z "$DIFY_API_TOKEN" ]; then
   exit 1
 fi
 
-# 引数から環境を取得
+# 引数を確認 ---
 LANGUAGE="$1"
 if [ -z "$LANGUAGE" ]; then
   LANGUAGE="english"
 fi
 
-echo "Selected language: $LANGUAGE"
-
-# 引数からdiffを取得、空の場合はクリップボードから取得
 GIT_DIFF="$2"
+
+# 引数がない場合はクリップボードから取得
 if [ -z "$GIT_DIFF" ]; then
   echo "No diff provided as argument. Getting diff from clipboard..."
   GIT_DIFF=$(pbpaste)
-  
-  # クリップボードも空の場合は終了
   if [ -z "$GIT_DIFF" ]; then
     echo "Error: No diff found in clipboard. Please provide a diff as an argument or copy it to clipboard."
     exit 1
   fi
 fi
 
+# Dify ワークフロー ---
 echo "Generating PR description for $LANGUAGE language..."
 
-# --- Dify ワークフロー ---
 JSON_DATA='{
   "inputs": {
     "language": "'"$LANGUAGE"'",
