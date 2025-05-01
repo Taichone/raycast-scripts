@@ -82,7 +82,7 @@ struct DateUtils {
 }
 
 struct NotionClient {
-    static func createTodo(notionToken: String, requestJSONObject: [String: Any]) async throws {
+    static func createTodo(notionToken: String, databaseID: String, title: String, startDate: String) async throws {
         let url = URL(string: "https://api.notion.com/v1/pages")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -90,6 +90,26 @@ struct NotionClient {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("2022-06-28", forHTTPHeaderField: "Notion-Version")
         
+        let requestJSONObject: [String: Any] = [
+            "parent": ["database_id": databaseID],
+            "properties": [
+                "Title": [
+                    "title": [
+                        [
+                            "text": [
+                                "content": title
+                            ]
+                        ]
+                    ]
+                ],
+                "Date": [
+                    "date": [
+                        "start": startDate
+                    ]
+                ]
+            ]
+        ]
+
         do {
             request.httpBody = try JSONSerialization.data(withJSONObject: requestJSONObject)
         } catch {
@@ -116,7 +136,7 @@ func main() {
             guard let notionToken = env["NOTION_TOKEN"], !notionToken.isEmpty else {
                 throw NSError(domain: "EnvReaderError", code: 1, userInfo: [NSLocalizedDescriptionKey: "NOTION_TOKEN is not set"])
             }
-            guard let databaseId = env["NOTION_TASK_DATABASE_ID"], !databaseId.isEmpty else {
+            guard let databaseID = env["NOTION_TASK_DATABASE_ID"], !databaseID.isEmpty else {
                 throw NSError(domain: "EnvReaderError", code: 1, userInfo: [NSLocalizedDescriptionKey: "NOTION_TASK_DATABASE_ID is not set"])
             }
             
@@ -130,34 +150,13 @@ func main() {
             let startDate = try DateUtils.validateDate(customDate)
             
             // Request
-            let requestJSONObject: [String: Any] = [
-                "parent": ["database_id": databaseId],
-                "properties": [
-                    "Title": [
-                        "title": [
-                            [
-                                "text": [
-                                    "content": title
-                                ]
-                            ]
-                        ]
-                    ],
-                    "Date": [
-                        "date": [
-                            "start": startDate
-                        ]
-                    ]
-                ]
-            ]
-
-            print("Sending request...")
-            try await NotionClient.createTodo(notionToken: notionToken, requestJSONObject: requestJSONObject)
-            print("Successfully created Todo!")
+            try await NotionClient.createTodo(notionToken: notionToken, databaseID: databaseID, title: title, startDate: startDate)
         } catch {
             print("ERROR: \(error)")
             exit(1)
         }
         
+        print("Successfully created Todo!")
         exit(0)
     }
     
