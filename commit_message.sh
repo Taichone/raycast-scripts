@@ -2,7 +2,7 @@
 
 # Required parameters:
 # @raycast.schemaVersion 1
-# @raycast.title Create PR Description
+# @raycast.title Create Commit Message
 # @raycast.mode compact
 
 # Optional parameters:
@@ -17,7 +17,7 @@ if [ -f .env ]; then
 fi
 
 DIFY_BASE_URL=$DIFY_BASE_URL
-DIFY_API_TOKEN=$DIFY_PR_GENERATOR_API_TOKEN
+DIFY_API_TOKEN=$DIFY_COMMIT_MESSAGE_GENERATOR_API_TOKEN
 
 if [ -z "$DIFY_BASE_URL" ]; then
   echo "Error: DIFY_BASE_URL is not set"
@@ -25,7 +25,7 @@ if [ -z "$DIFY_BASE_URL" ]; then
 fi
 
 if [ -z "$DIFY_API_TOKEN" ]; then
-  echo "Error: DIFY_PR_TOKEN is not set"
+  echo "Error: DIFY_COMMIT_MESSAGE_GENERATOR_API_TOKEN is not set"
   exit 1
 fi
 
