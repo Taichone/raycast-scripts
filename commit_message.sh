@@ -6,7 +6,7 @@
 # @raycast.mode compact
 
 # Optional parameters:
-# @raycast.icon ./Assets/GitHub.png
+# @raycast.icon ./images/GitHub.png
 # @raycast.argument1 { "type": "dropdown", "placeholder": "Language", "optional": true, "data": [{"title": "English", "value": "english"}, {"title": "Japanese", "value": "japanese"}] }
 # @raycast.argument2 { "type": "text", "placeholder": "Diff (optional)", "optional": true }
 # @raycast.packageName Dify
