@@ -9,6 +9,7 @@
 # @raycast.icon ./images/notion.png
 # @raycast.argument1 { "type": "text", "placeholder": "Title" }
 # @raycast.argument2 { "type": "text", "placeholder": "Date (yyyy-mm-dd, +n)", "optional": true }
+# @raycast.argument3 { "type": "dropdown", "placeholder": "Priority", "optional": true, "data": [{"title": "High", "value": "High"}, {"title": "Critical", "value": "Critical"}] }
 # @raycast.packageName Notion
 
 # エラーハンドリング
@@ -75,7 +76,19 @@ validate_date() {
 create_todo() {
   local title="$1"
   local start_date="$2"
-  
+  local priority="$3"
+
+  # Priority JSON fragment (Normal または未指定の場合は含めない)
+  local priority_json=""
+  if [ -n "$priority" ] && [ "$priority" != "Normal" ]; then
+    priority_json=",
+    \"Priority\": {
+      \"select\": {
+        \"name\": \"$priority\"
+      }
+    }"
+  fi
+
   # JSONデータを作成
   json_data=$(cat << EOF
 {
@@ -94,7 +107,12 @@ create_todo() {
       "date": {
         "start": "$start_date"
       }
-    }
+    },
+    "Status": {
+      "status": {
+        "name": "Submitted"
+      }
+    }${priority_json}
   }
 }
 EOF
@@ -126,12 +144,13 @@ main() {
   
   title="$1"
   custom_date="$2"
-  
+  priority="$3"
+
   # 日付を検証
   start_date=$(validate_date "$custom_date")
-  
+
   # Notionタスクを作成
-  create_todo "$title" "$start_date"
+  create_todo "$title" "$start_date" "$priority"
   
   echo "Successfully created Todo!"
 }
